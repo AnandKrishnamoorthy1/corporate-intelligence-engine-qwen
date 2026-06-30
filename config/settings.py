@@ -79,6 +79,52 @@ class Settings(BaseSettings):
     finnhub_api_key: Optional[str] = Field(default=None, env="FINNHUB_API_KEY")
     
     # ========================================================================
+    # ROBINHOOD AGENTIC TRADING CONFIGURATION (OAuth 2.1 PKCE - No Client Secret!)
+    # ========================================================================
+    
+    robinhood_mcp_endpoint: str = Field(
+        default="https://agent.robinhood.com/mcp/trading",
+        env="ROBINHOOD_MCP_ENDPOINT",
+        description="Robinhood Agentic Trading MCP endpoint"
+    )
+    robinhood_account_id: Optional[str] = Field(
+        default=None,
+        env="ROBINHOOD_ACCOUNT_ID",
+        description="Your Robinhood account ID for agentic trading"
+    )
+    robinhood_trading_enabled: bool = Field(
+        default=False,
+        env="ROBINHOOD_TRADING_ENABLED",
+        description="Enable agentic trading (PKCE OAuth - no secrets needed)"
+    )
+    
+    # ========================================================================
+    # BROKER SELECTION & MULTI-TENANCY CONFIGURATION
+    # ========================================================================
+    
+    # IMPORTANT: For production/public deployment, set BROKER_TYPE=simulation
+    # This prevents accidental real money execution and enables multi-user demo
+    broker_type: str = Field(
+        default="live",
+        env="BROKER_TYPE",
+        description="Broker implementation: 'live' for real Robinhood trading, 'simulation' for paper trading"
+    )
+    
+    # Session-based simulation account for public users
+    use_session_simulation_account: bool = Field(
+        default=False,
+        env="USE_SESSION_SIMULATION_ACCOUNT",
+        description="Generate per-session simulation account IDs (for multi-user public app)"
+    )
+    
+    # Simulation ledger path (where paper trading state is stored)
+    simulation_ledger_path: str = Field(
+        default="simulation_ledger.json",
+        env="SIMULATION_LEDGER_PATH",
+        description="Path to JSON file storing paper trading state"
+    )
+    
+    # ========================================================================
     # DATABASE CONFIGURATION
     # ========================================================================
     

@@ -1,0 +1,47 @@
+{
+  "accounts": {
+    "SIM-DEFAULT": {
+      "id": "SIM-DEFAULT",
+      "account_type": "paper_trading",
+      "cash_balance": 9700.0,
+      "portfolio_value": 10000.0,
+      "positions": {
+        "AMD": 0.5560807429238726
+      },
+      "created_at": "2026-06-29T23:31:07.430943"
+    }
+  },
+  "orders": [
+    {
+      "order_id": "sim-ea70afb3",
+      "account_id": "SIM-DEFAULT",
+      "ticker": "AMD",
+      "side": "buy",
+      "quantity": 0.18536024764129086,
+      "execution_price": 539.49,
+      "total_value": 100.00000000000001,
+      "timestamp": "2026-06-29T23:33:58.880563"
+    },
+    {
+      "order_id": "sim-0c739931",
+      "account_id": "SIM-DEFAULT",
+      "ticker": "AMD",
+      "side": "buy",
+      "quantity": 0.18536024764129086,
+      "execution_price": 539.49,
+      "total_value": 100.00000000000001,
+      "timestamp": "2026-06-29T23:36:50.145200"
+    },
+    {
+      "order_id": "sim-ab34ace1",
+      "account_id": "SIM-DEFAULT",
+      "ticker": "AMD",
+      "side": "buy",
+      "quantity": 0.18536024764129086,
+      "execution_price": 539.49,
+      "total_value": 100.00000000000001,
+      "timestamp": "2026-06-29T23:44:12.487154"
+    }
+  ],
+  "positions": {}
+}

@@ -107,6 +107,18 @@ if "last_response" not in st.session_state:
 if "api_available" not in st.session_state:
     st.session_state.api_available = None
 
+if "approval_submitted" not in st.session_state:
+    st.session_state.approval_submitted = False
+
+if "approval_timeout" not in st.session_state:
+    st.session_state.approval_timeout = None
+
+if "pending_approval_request" not in st.session_state:
+    st.session_state.pending_approval_request = None
+
+if "trade_completed" not in st.session_state:
+    st.session_state.trade_completed = False
+
 
 # ============================================================================
 # CONFIGURATION & CONSTANTS
@@ -116,8 +128,8 @@ API_BASE_URL = "http://localhost:8002"
 API_HEALTH_ENDPOINT = f"{API_BASE_URL}/health"
 API_ANALYZE_ENDPOINT = f"{API_BASE_URL}/api/analyze"
 API_STATUS_ENDPOINT = f"{API_BASE_URL}/api/requests"
-REQUEST_TIMEOUT = 300  # seconds (5 minutes max)
-INACTIVITY_TIMEOUT = 120  # seconds (2 minutes of no log updates = stuck)
+REQUEST_TIMEOUT = 600  # seconds (10 minutes max - increased for OAuth/MCP calls)
+INACTIVITY_TIMEOUT = 180  # seconds (3 minutes of no log updates = stuck)
 POLL_INTERVAL = 5  # seconds (poll every 5 seconds for new logs)
 
 
@@ -424,6 +436,9 @@ user_input = st.chat_input(
 )
 
 if user_input:
+    # Reset trade completion flag for new requests
+    st.session_state.trade_completed = False
+    
     # Check API availability first
     if not check_api_health():
         st.error(
@@ -451,7 +466,22 @@ if user_input:
             # Call the API with streaming logs
             response = call_analysis_api_with_streaming(user_input, log_placeholder)
             
+            # AGGRESSIVE DEBUG
+            st.write("---")
+            st.write("### 🚨 AGGRESSIVE DEBUG OUTPUT")
+            st.write(f"✓ Response object type: `{type(response)}`")
+            st.write(f"✓ Response is None: `{response is None}`")
             if response:
+                st.write(f"✓ Response status: `{response.get('status')}`")
+                st.write(f"✓ Response keys: `{list(response.keys())}`")
+                st.write(f"✓ pending_approval: `{response.get('pending_approval')}`")
+                st.write(f"✓ request_id: `{response.get('request_id')}`")
+            st.write("---")
+            
+            if response:
+                st.write(f"**[DEBUG] Response Status:** `{response.get('status')}`")
+                st.write(f"**[DEBUG] Pending Approval:** `{response.get('pending_approval')}`")
+                
                 # Display logs from response
                 logs = response.get("logs", [])
                 if logs:
@@ -470,6 +500,156 @@ if user_input:
                         expanded=False,
                     )
                     st.error(f"Error: {response.get('error_message', 'Unknown error')}")
+                
+                # Check for approval pending
+                elif response.get("status") == "awaiting_approval":
+                    st.info("✅ Status check passed: awaiting_approval detected")
+                    status.update(
+                        label="⏳ Awaiting Human Approval",
+                        state="running",
+                        expanded=True,
+                    )
+                    
+                    # Store approval request in session state so it persists after container closes
+                    pending_approval = response.get("pending_approval", {})
+                    request_id = response.get("request_id", "")
+                    st.session_state.pending_approval_request = {
+                        "request_id": request_id,
+                        "pending_approval": pending_approval,
+                        "response": response,
+                    }
+                    
+                    st.warning("🔒 **TRADE APPROVAL REQUIRED** (⏱️ 10 second timeout)")
+                    
+                    # Display pending approval details
+                    pending_approval = response.get("pending_approval", {})
+                    request_id = response.get("request_id", "")
+                    
+                    if pending_approval:
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.markdown("**Trade Details:**")
+                            st.info(
+                                f"**Action:** {pending_approval.get('action', 'N/A')}\n\n"
+                                f"**Ticker:** {pending_approval.get('ticker', 'N/A')}\n\n"
+                                f"**Amount:** {pending_approval.get('amount', 'N/A')}\n\n"
+                                f"**Request ID:** `{request_id}`"
+                            )
+                        
+                        with col2:
+                            st.markdown("**Reasoning:**")
+                            st.text(
+                                pending_approval.get('reasoning', 'No reasoning provided')
+                            )
+                    
+                    # Approval buttons - NO BLOCKING TIMER
+                    st.markdown("---")
+                    st.markdown("### ✅ Approval Decision")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        if st.button("✅ Approve Trade", key=f"approve_{request_id}", use_container_width=True):
+                            with st.spinner("Submitting approval and executing trade..."):
+                                try:
+                                    # Step 1: Submit approval
+                                    approve_response = requests.post(
+                                        f"{API_BASE_URL}/api/approve/{request_id}",
+                                        json={"approved": True, "approver_notes": "Approved via Streamlit UI"},
+                                        timeout=120  # Increased for OAuth/MCP
+                                    )
+                                    
+                                    if approve_response.status_code != 200:
+                                        error_resp = approve_response.json()
+                                        st.error(f"❌ Failed to submit approval: {approve_response.status_code}")
+                                        st.error(
+                                            f"**Error:** {error_resp.get('detail', 'Unknown error')}\n\n"
+                                            f"**Status Code:** {approve_response.status_code}"
+                                        )
+                                    else:
+                                        st.success("✅ Approval stored!")
+                                        
+                                        # Step 2: Execute the trade
+                                        time.sleep(0.5)
+                                        execute_response = requests.post(
+                                            f"{API_BASE_URL}/api/execute/{request_id}",
+                                            timeout=120  # Increased for OAuth/MCP
+                                        )
+                                        
+                                        if execute_response.status_code == 200:
+                                            result = execute_response.json()
+                                            st.success("✅ **TRADE EXECUTED SUCCESSFULLY!**")
+                                            
+                                            # Format and display the trade execution result
+                                            trade_details = result.get("trade_details", {})
+                                            execution_result = result.get("execution_result", {})
+                                            
+                                            col1, col2 = st.columns(2)
+                                            
+                                            with col1:
+                                                st.markdown("### 📋 Trade Details")
+                                                st.info(
+                                                    f"**Ticker:** {trade_details.get('ticker', 'N/A')}\n\n"
+                                                    f"**Action:** {trade_details.get('action', 'N/A')}\n\n"
+                                                    f"**Amount:** {trade_details.get('amount', 'N/A')}\n\n"
+                                                    f"**Quantity:** {trade_details.get('quantity', 'N/A')}"
+                                                )
+                                            
+                                            with col2:
+                                                st.markdown("### 📊 Order Execution")
+                                                filled_price = execution_result.get('filled_price')
+                                                quantity = execution_result.get('quantity')
+                                                st.success(
+                                                    f"**Order ID:** `{execution_result.get('order_id', 'N/A')}`\n\n"
+                                                    f"**Status:** {execution_result.get('status', 'N/A').upper()}\n\n"
+                                                    f"**Fill Price:** ${filled_price:.2f}\n\n"
+                                                    f"**Quantity Filled:** {quantity:.4f} shares"
+                                                )
+                                            
+                                            st.markdown("---")
+                                            st.markdown("### ✅ Summary")
+                                            st.success(
+                                                f"💰 **Total Value:** ${execution_result.get('total_value', 0):.2f}\n\n"
+                                                f"📅 **Filled At:** {execution_result.get('filled_at', 'N/A')}\n\n"
+                                                f"🎮 **Simulated Trade:** {'Yes' if execution_result.get('simulated') else 'No'}"
+                                            )
+                                        else:
+                                            error_resp = execute_response.json()
+                                            st.error(f"❌ Execution failed: {execute_response.status_code}")
+                                            st.error(
+                                                f"**Error:** {error_resp.get('detail', 'Unknown error')}\n\n"
+                                                f"**Status Code:** {execute_response.status_code}"
+                                            )
+                                except Exception as e:
+                                    st.error(f"❌ Error: {str(e)}")
+                                    import traceback
+                                    st.write(traceback.format_exc())
+                    
+                    with col2:
+                        if st.button("❌ Reject Trade", key=f"reject_{request_id}", use_container_width=True):
+                            with st.spinner("Submitting rejection..."):
+                                try:
+                                    reject_response = requests.post(
+                                        f"{API_BASE_URL}/api/approve/{request_id}",
+                                        json={"approved": False, "approver_notes": "Rejected via Streamlit UI"},
+                                        timeout=120  # Increased for OAuth/MCP
+                                    )
+                                    
+                                    if reject_response.status_code == 200:
+                                        st.error("❌ **TRADE REJECTED**")
+                                    else:
+                                        error_resp = reject_response.json()
+                                        st.error(f"Failed to submit rejection: {reject_response.status_code}")
+                                        st.error(
+                                            f"**Error:** {error_resp.get('detail', 'Unknown error')}\n\n"
+                                            f"**Status Code:** {reject_response.status_code}"
+                                        )
+                                except Exception as e:
+                                    st.error(f"Error: {str(e)}")
+
+
+                
                 else:
                     # Update status to complete
                     status.update(
@@ -507,6 +687,150 @@ if user_input:
                     state="error",
                     expanded=False,
                 )
+
+
+# =========================================================================
+# APPROVAL UI - OUTSIDE THE STATUS CONTAINER (PERSISTS AFTER CONTAINER CLOSES)
+# =========================================================================
+
+# Only show approval UI if trade hasn't been completed
+if st.session_state.get("pending_approval_request") and not st.session_state.get("trade_completed"):
+    approval_data = st.session_state.pending_approval_request
+    request_id = approval_data.get("request_id", "")
+    pending_approval = approval_data.get("pending_approval", {})
+    
+    st.markdown("---")
+    st.warning("🔒 **TRADE APPROVAL REQUIRED** - Click buttons below")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Trade Details:**")
+        st.info(
+            f"**Action:** {pending_approval.get('action', 'N/A')}\n\n"
+            f"**Ticker:** {pending_approval.get('ticker', 'N/A')}\n\n"
+            f"**Amount:** {pending_approval.get('amount', 'N/A')}\n\n"
+            f"**Request ID:** `{request_id}`"
+        )
+    
+    with col2:
+        st.markdown("**Reasoning:**")
+        st.text(
+            pending_approval.get('reasoning', 'No reasoning provided')
+        )
+    
+    # Approval buttons
+    st.markdown("---")
+    st.markdown("### ✅ Approval Decision")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("✅ Approve Trade", key=f"approve_{request_id}_persistent", use_container_width=True):
+            with st.spinner("Submitting approval and executing trade..."):
+                try:
+                    # Step 1: Submit approval
+                    approve_response = requests.post(
+                        f"{API_BASE_URL}/api/approve/{request_id}",
+                        json={"approved": True, "approver_notes": "Approved via Streamlit UI"},
+                        timeout=120  # Increased for OAuth/MCP
+                    )
+                    
+                    if approve_response.status_code != 200:
+                        error_resp = approve_response.json()
+                        st.error(f"❌ Failed to submit approval: {approve_response.status_code}")
+                        st.error(
+                            f"**Error:** {error_resp.get('detail', 'Unknown error')}\n\n"
+                            f"**Status Code:** {approve_response.status_code}"
+                        )
+                    else:
+                        st.success("✅ Approval stored!")
+                        
+                        # Step 2: Execute the trade
+                        time.sleep(0.5)
+                        execute_response = requests.post(
+                            f"{API_BASE_URL}/api/execute/{request_id}",
+                            timeout=120  # Increased for OAuth/MCP
+                        )
+                        
+                        if execute_response.status_code == 200:
+                            result = execute_response.json()
+                            st.success("✅ **TRADE EXECUTED SUCCESSFULLY!**")
+                            
+                            # Format and display the trade execution result
+                            trade_details = result.get("trade_details", {})
+                            execution_result = result.get("execution_result", {})
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown("### 📋 Trade Details")
+                                st.info(
+                                    f"**Ticker:** {trade_details.get('ticker', 'N/A')}\n\n"
+                                    f"**Action:** {trade_details.get('action', 'N/A')}\n\n"
+                                    f"**Amount:** {trade_details.get('amount', 'N/A')}\n\n"
+                                    f"**Quantity:** {trade_details.get('quantity', 'N/A')}"
+                                )
+                            
+                            with col2:
+                                st.markdown("### 📊 Order Execution")
+                                filled_price = execution_result.get('filled_price')
+                                quantity = execution_result.get('quantity')
+                                st.success(
+                                    f"**Order ID:** `{execution_result.get('order_id', 'N/A')}`\n\n"
+                                    f"**Status:** {execution_result.get('status', 'N/A').upper()}\n\n"
+                                    f"**Fill Price:** ${filled_price:.2f}\n\n"
+                                    f"**Quantity Filled:** {quantity:.4f} shares"
+                                )
+                            
+                            st.markdown("---")
+                            st.markdown("### ✅ Summary")
+                            st.success(
+                                f"💰 **Total Value:** ${execution_result.get('total_value', 0):.2f}\n\n"
+                                f"📅 **Filled At:** {execution_result.get('filled_at', 'N/A')}\n\n"
+                                f"🎮 **Simulated Trade:** {'Yes' if execution_result.get('simulated') else 'No'}"
+                            )
+                            
+                            # Clear the approval request (but don't rerun yet)
+                            st.session_state.pending_approval_request = None
+                            st.session_state.trade_completed = True
+                        else:
+                            error_resp = execute_response.json()
+                            st.error(f"❌ Execution failed: {execute_response.status_code}")
+                            st.error(
+                                f"**Error:** {error_resp.get('detail', 'Unknown error')}\n\n"
+                                f"**Status Code:** {execute_response.status_code}"
+                            )
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    import traceback
+                    st.write(traceback.format_exc())
+    
+    with col2:
+        if st.button("❌ Reject Trade", key=f"reject_{request_id}_persistent", use_container_width=True):
+            with st.spinner("Submitting rejection..."):
+                try:
+                    reject_response = requests.post(
+                        f"{API_BASE_URL}/api/approve/{request_id}",
+                        json={"approved": False, "approver_notes": "Rejected via Streamlit UI"},
+                        timeout=120  # Increased for OAuth/MCP
+                    )
+                    
+                    if reject_response.status_code == 200:
+                        st.error("❌ **TRADE REJECTED**")
+                        
+                        # Clear the approval request (but don't rerun yet)
+                        st.session_state.pending_approval_request = None
+                        st.session_state.trade_completed = True
+                    else:
+                        error_resp = reject_response.json()
+                        st.error(f"Failed to submit rejection: {reject_response.status_code}")
+                        st.error(
+                            f"**Error:** {error_resp.get('detail', 'Unknown error')}\n\n"
+                            f"**Status Code:** {reject_response.status_code}"
+                        )
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
 
 # ============================================================================

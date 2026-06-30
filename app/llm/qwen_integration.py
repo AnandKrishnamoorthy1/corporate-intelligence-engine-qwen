@@ -191,8 +191,15 @@ def call_qwen_for_triage(user_input: str) -> Dict[str, Any]:
             },
             "routing_path": {
                 "type": "string",
-                "enum": ["research", "general_q"],
+                "enum": ["research", "direct_trade", "general_q"],
                 "description": "Routing path for the query"
+            },
+            "trade_action": {
+                "anyOf": [
+                    {"type": "string", "enum": ["BUY", "SELL"]},
+                    {"type": "null"}
+                ],
+                "description": "Trade action (BUY/SELL) for direct_trade path, null for others"
             },
             "confidence": {
                 "type": "number",

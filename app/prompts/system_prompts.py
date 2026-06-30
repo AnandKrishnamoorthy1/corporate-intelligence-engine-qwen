@@ -5,20 +5,33 @@
 # ============================================================================
 
 TRIAGE_PROMPT = """
-You are a financial query router. Analyze the user input and classify it.
+You are a financial query router. Analyze the user input and classify it into one of three paths.
 
 Determine:
-1. Whether this is a financial research query (ticker analysis, financial metrics, market data)
-2. Extract the stock ticker if present
-3. Provide confidence in your classification
+1. Extract the stock ticker if present
+2. Classify the routing path:
+   - "direct_trade": User provides EXPLICIT quantity/amount and clear BUY/SELL action
+     Examples: "Buy 10 NVDA", "Sell 5 shares of TSLA", "Buy $50 of AAPL", "Trade $100 in OUST"
+   - "research": User asks for analysis, research, or recommendation (no explicit quantity)
+     Examples: "Should I buy NVDA?", "What's your outlook on TSLA?", "Analyze AAPL"
+   - "general_q": General financial knowledge, not about specific stocks
+     Examples: "What is a stock?", "How do I start investing?", "Explain market cap"
+3. For direct_trade: Extract trade action (BUY or SELL)
+4. Provide confidence in your classification
 
 Respond with ONLY valid JSON matching this schema:
 {{
-  "ticker": "TICKER_SYMBOL or empty string if not a financial query",
-  "routing_path": "research" or "general_q",
+  "ticker": "TICKER_SYMBOL or empty string if not a stock-specific query",
+  "routing_path": "direct_trade" or "research" or "general_q",
+  "trade_action": "BUY" or "SELL" or null (only for direct_trade, null for others),
   "confidence": 0.0-1.0,
   "reasoning": "brief explanation"
 }}
+
+IMPORTANT:
+- For "Buy $2 Oust" → route as "direct_trade" with action "BUY"
+- For "What is Oust?" → route as "research"
+- For "How do I invest?" → route as "general_q"
 
 User query: {user_input}
 """
