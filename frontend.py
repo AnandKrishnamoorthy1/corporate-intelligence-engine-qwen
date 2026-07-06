@@ -319,7 +319,8 @@ def check_api_health() -> bool:
     try:
         # Use POST to /invoke - the verified working endpoint on Alibaba Cloud
         # GET requests to root may trigger file download restrictions on some cloud providers
-        response = requests.post(f"{API_BASE_URL}/invoke", timeout=5)
+        # Timeout: 30s to allow cold starts on serverless (8-12s to wake up container)
+        response = requests.post(f"{API_BASE_URL}/invoke", timeout=30)
         
         # Check for successful response with expected status
         if response.status_code == 200:
@@ -700,6 +701,7 @@ st.markdown(
 
 with st.sidebar:
     st.markdown("### ⚙️ Configuration")
+    st.caption(f"🔗 Connected to: `{API_BASE_URL}`")
     
     # API Health Status
     col1, col2 = st.columns([3, 1])
