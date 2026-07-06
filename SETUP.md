@@ -2,9 +2,25 @@
 
 Complete setup instructions for the Corporate Intelligence Engine with Qwen LLM.
 
-## Prerequisites
+## Deployment Options
 
-- Python 3.10 or later
+### Option A: Production Deployment (Recommended)
+- **Frontend:** Streamlit Community Cloud (free, auto-deploys from GitHub)
+- **Backend:** Alibaba Cloud Function Compute 3.0 (serverless, ~$0.05/month)
+- See [DEPLOYMENT_ALIBABA.md](./deployment/DEPLOYMENT_ALIBABA.md) for full instructions
+
+### Option B: Local Development
+- Both backend and frontend run on your machine
+- Perfect for development and testing
+- Follow the instructions below
+
+---
+
+## Local Development Setup
+
+### Prerequisites
+
+- Python 3.12
 - pip or conda package manager
 - Internet connection (for Qwen API calls)
 - **Qwen API Key** - Get it from [Alibaba DashScope](https://dashscope.aliyun.com/)

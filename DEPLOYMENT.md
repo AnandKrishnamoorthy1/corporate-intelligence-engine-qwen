@@ -1,8 +1,26 @@
 # Deployment & Configuration Guide
 
-Complete instructions for running the Corporate Intelligence Engine locally, with Qwen API integration, Docker containerization, and production configuration.
+Complete instructions for running the Corporate Intelligence Engine locally, with Qwen API integration, Docker containerization, and cloud deployment.
 
-## Architecture Overview
+## Deployment Modes
+
+### 🚀 Production: Alibaba Cloud + Streamlit Cloud
+**Recommended for hackathons and live demos**
+- Frontend: Streamlit Community Cloud (free tier, auto-deployed)
+- Backend: Alibaba Cloud Function Compute 3.0 (serverless, scales to zero)
+- Cost: ~$0.05/month + Qwen token usage
+- See [deployment/DEPLOYMENT_ALIBABA.md](./deployment/DEPLOYMENT_ALIBABA.md) for complete setup
+
+### 💻 Local Development
+**Recommended for development and testing**
+- Both services run on your local machine
+- Port 9000 (backend), Port 8501 (frontend)
+- Full debugging and iteration capability
+- See below for setup instructions
+
+---
+
+## Local Development Setup
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -94,8 +112,8 @@ pip show fastapi streamlit uvicorn
 # Navigate to project directory
 cd c:\AI_Agents\corporate-intelligence-engine
 
-# Start the Uvicorn server with auto-reload
-uvicorn backend:app --reload --host 0.0.0.0 --port 8002
+# Start the Uvicorn server with auto-reload (port 9000 for local dev)
+uvicorn backend:app --reload --host 0.0.0.0 --port 9000
 ```
 
 **Expected Output:**
@@ -311,15 +329,15 @@ curl http://localhost:8002/api/routes
 
 **Solution:**
 1. Ensure the FastAPI backend is running in Terminal 1
-2. Verify it's running on `http://localhost:8002`
+2. Verify it's running on `http://localhost:9000`
 3. Reload the Streamlit page (Ctrl+R or Command+R)
 
-### Issue: Backend won't start (port 8002 already in use)
+### Issue: Backend won't start (port 9000 already in use)
 
 **Solution:**
 ```bash
-# Find process using port 8002
-netstat -ano | findstr :8002
+# Find process using port 9000
+netstat -ano | findstr :9000
 
 # Kill the process (replace PID)
 taskkill /PID <PID> /F
@@ -698,10 +716,10 @@ BACKEND_PORT=8001 python backend.py
 
 ```bash
 # Check backend is running
-curl http://localhost:8002/health
+curl http://localhost:9000/health
 
 # Check firewall
-# Ensure port 8002 is open
+# Ensure port 9000 is open
 ```
 
 ### Qwen API Errors

@@ -2,7 +2,7 @@
 
 **Track 4 Submission — Qwen Cloud Global AI Hackathon: Autopilot Agent**
 
-A production-grade agentic trading system powered by **Alibaba Qwen** (`qwen3.7-plus`). A **Tri-Agent Adversarial Investment Committee** — Bull Analyst, Bear Auditor, and Portfolio Director — debates live market data from Alpha Vantage and SEC EDGAR before issuing a vetted BUY / HOLD / SELL verdict. Every trade requires explicit human approval before executing against a paper-trading simulation.
+A production-grade agentic trading system powered by **Alibaba Qwen** (`qwen3.7-plus`). A **Tri-Agent Adversarial Investment Committee** — Bull Analyst, Bear Auditor, and Portfolio Director — debates live market data from SEC EDGAR before issuing a vetted BUY / HOLD / SELL verdict. Every trade requires explicit human approval before executing against a paper-trading simulation.
 
 ---
 
@@ -10,7 +10,7 @@ A production-grade agentic trading system powered by **Alibaba Qwen** (`qwen3.7-
 
 | Pain Point | Solution |
 |---|---|
-| Manual multi-source data aggregation | 3-way parallel fetch: AV quote + fundamentals + SEC 10-Q |
+| Manual multi-source data aggregation | Parallel fetch: SEC 10-Q data from EDGAR + Yahoo Finance |
 | Single-analyst confirmation bias | Adversarial Bull vs Bear debate with structured rebuttal |
 | Unverifiable AI claims | Citation system — every data point traced to its API source |
 | Unsafe autonomous trading | Human-in-loop approval gate before every order execution |
@@ -18,7 +18,7 @@ A production-grade agentic trading system powered by **Alibaba Qwen** (`qwen3.7-
 
 **Track 4 Alignment:**
 - ✅ **Ambiguous input handling** — Triage node classifies 4 query types via structured Qwen output
-- ✅ **External tool invocation** — Alpha Vantage (real-time + fundamentals) + SEC EDGAR (XBRL 10-Q)
+- ✅ **External tool invocation** — SEC EDGAR (XBRL 10-Q) + Yahoo Finance (stock data)
 - ✅ **Human-in-loop gates** — Approval checkpoint before any trade executes
 - ✅ **End-to-end agentic workflow** — Query → Triage → Committee → Approval → Execution → Report
 - ✅ **Robinhood Agentic Trading MCP** — `RobinhoodMCPClient` wired through broker abstraction layer
@@ -27,33 +27,46 @@ A production-grade agentic trading system powered by **Alibaba Qwen** (`qwen3.7-
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.10+
+### Cloud Deployment (Production)
+
+**Frontend:** Deployed on [Streamlit Community Cloud](https://streamlit.io/cloud)
+- Public URL: `https://[your-username]-corporate-intelligence.streamlit.app`
+- No cost, auto-deployed from GitHub
+
+**Backend:** Deployed on [Alibaba Cloud Function Compute 3.0](https://www.alibabacloud.com/product/function-compute)
+- Serverless runtime: `custom.debian11` with Python 3.12
+- HTTP trigger endpoint provided by Alibaba console
+- Cost: ~$0.05/month + Qwen token costs (scales to zero when idle)
+
+**Try it now:**
+- Open your Streamlit app URL
+- Try: `"Analyze NVDA"` — full committee research path
+- Or: `"Buy $500 of TSLA"` — direct trade with approval gate
+- Or: `"Show my portfolio"` — live P&L + HHI risk analysis
+
+### Local Development
+
+**Prerequisites:**
+- Python 3.12
 - Qwen API key — [DashScope International](https://dashscope-intl.aliyuncs.com/)
-- Alpha Vantage API key — [alphavantage.co](https://www.alphavantage.co/support/#api-key) (free tier works)
 
-### Setup
-
+**Setup:**
 ```bash
 # 1. Install dependencies
 pip install -r requirements.txt
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env — set DASHSCOPE_API_KEY and ALPHA_VANTAGE_API_KEY
+# Edit .env — set DASHSCOPE_API_KEY and BACKEND_API_URL
 
-# 3. Terminal 1 — Backend (port 8002)
-python backend.py
+# 3. Terminal 1 — Backend (port 9000)
+python -m uvicorn backend:app --host 0.0.0.0 --port 9000 --reload
 
 # 4. Terminal 2 — Frontend (port 8501)
 streamlit run frontend.py
 ```
 
-Open `http://localhost:8501` and try:
-- `"Analyze NVDA"` — full committee research path
-- `"Buy $500 of TSLA"` — direct trade with approval gate
-- `"Show my portfolio"` — live P&L + HHI risk analysis
-- `"What is a P/E ratio?"` — general Q&A path
+Open `http://localhost:8501` and the frontend will automatically connect to `http://localhost:9000`
 
 ---
 
@@ -72,13 +85,12 @@ Each round: Bull and Bear argue in PARALLEL (ThreadPoolExecutor)
             Director weighs evidence quality, not rhetoric
 ```
 
-### 2. 3-Way Parallel Data Fetch
+### 2. Parallel Data Fetch
 ```
 get_enriched_stock_data(ticker)
-    ├── [Thread 1] Alpha Vantage GLOBAL_QUOTE  → price, change%, volume
-    ├── [Thread 2] Alpha Vantage OVERVIEW      → P/E, EPS, sector, margins, beta
-    └── [Thread 3] SEC EDGAR 10-Q (edgartools) → revenue, NI, R&D, FCF (last 2 qtrs)
-                                                  parsed from XBRL — audited data
+    ├─ [Thread 1] Yahoo Finance API → price, change%, volume
+    └─ [Thread 2] SEC EDGAR 10-Q (edgartools) → revenue, NI, R&D, FCF (last 2 qtrs)
+                                               parsed from XBRL — audited data
 ```
 
 ### 3. 4-Path Intelligent Routing
@@ -100,13 +112,13 @@ Committee → BUY verdict
 Human reviews in sidebar (Approve / Reject)
     ↓
 Approved → broker.place_order() executes via BaseBroker abstraction
-           Portfolio ledger updates with real Alpha Vantage fill price
+           Portfolio ledger updates with current market data
 Rejected → report updated, no trade executed
 ```
 
 ### 5. Citation / Source Transparency
 Every data point in the report carries an inline citation marker (`[1]` `[2]` `[3]` `[4]`).  
-The sidebar **📚 Sources** panel shows the exact raw API payload each marker refers to — judges can verify no hallucination.
+The sidebar **📚 Sources** panel shows the exact raw API payload each marker refers to — ensuring full transparency and preventing hallucination.
 
 ### 6. NDJSON Streaming
 Backend streams `{"type":"log",...}` and `{"type":"result",...}` events over a single HTTP connection. The frontend renders live step-by-step progress (Claude/Copilot style) without polling.
@@ -115,21 +127,46 @@ Backend streams `{"type":"log",...}` and `{"type":"result",...}` events over a s
 
 ## 🏗️ Architecture
 
+### Production Deployment
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Streamlit Frontend  (port 8501)                            │
-│  • NDJSON stream consumer — live step display               │
-│  • Sidebar: Portfolio panel, 📚 Sources citations          │
-│  • Approve / Reject trade buttons                           │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ HTTP / NDJSON stream
-┌──────────────────────────▼──────────────────────────────────┐
-│  FastAPI Backend  (port 8002)                               │
-│  /api/analyze/stream  — NDJSON streaming endpoint           │
-│  /api/approve/{id}    — human approval decision             │
-│  /api/execute/{id}    — post-approval trade execution       │
-│  /api/portfolio       — live portfolio with AV prices       │
-└──────────────────────────┬──────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│  Streamlit Community Cloud                                      │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  Frontend (frontend.py)                                  │  │
+│  │  • NDJSON stream consumer — live step display            │  │
+│  │  • Sidebar: Portfolio panel, 📚 Sources citations       │  │
+│  │  • Approve / Reject trade buttons                        │  │
+│  └──────────────────────┬───────────────────────────────────┘  │
+│                         │ HTTPS / NDJSON stream                  │
+└─────────────────────────┼──────────────────────────────────────┘
+                          │
+                          │
+┌─────────────────────────▼──────────────────────────────────────┐
+│  Alibaba Cloud Function Compute 3.0                             │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │  FastAPI Backend (Python 3.12)                         │    │
+│  │  /api/analyze/stream  — NDJSON streaming endpoint      │    │
+│  │  /api/approve/{id}    — human approval decision        │    │
+│  │  /api/execute/{id}    — post-approval trade execution  │    │
+│  │  /api/portfolio       — live portfolio with prices     │    │
+│  │                                                         │    │
+│  │  Runtime: custom.debian11 (serverless container)       │    │
+│  │  Port: 9000 (HTTP trigger)                             │    │
+│  │  Memory: 1GB | Concurrency: 10 | Timeout: 300s         │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                    ▲                                             │
+│                    │ (Internal)                                  │
+└────────────────────┼─────────────────────────────────────────────┘
+                     │
+          ┌──────────▼─────────────┐
+          │  Orchestrator (Graph)  │
+          │  orchestrator.py       │
+          │                        │
+          │ • Triage Node          │
+          │ • Research Node        │
+          │ • General Q Node       │
+          │ • Reporting Node       │
+          └──────────┬─────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
 │  LangGraph State Machine  (orchestrator.py)                 │
@@ -149,9 +186,9 @@ Backend streams `{"type":"log",...}` and `{"type":"result",...}` events over a s
                            │
           ┌────────────────┼────────────────┐
           ▼                ▼                ▼
-   Alpha Vantage      SEC EDGAR         Broker
-   GLOBAL_QUOTE       10-Q XBRL     (MockSimulation
-   + OVERVIEW         (edgartools)   Engine / Robinhood
+   Yahoo Finance      SEC EDGAR         Broker
+   (stock data)       10-Q XBRL     (MockSimulation
+                      (edgartools)   Engine / Robinhood
                                      MCP Client)
 ```
 
@@ -159,9 +196,8 @@ Backend streams `{"type":"log",...}` and `{"type":"result",...}` events over a s
 ```
 research_node
     │
-    ├── get_enriched_stock_data(ticker)          ← 3 threads, one call
-    │       ├── AV GLOBAL_QUOTE
-    │       ├── AV OVERVIEW
+    ├── get_enriched_stock_data(ticker)          ← parallel fetch via threads
+    │       ├─ Yahoo Finance API
     │       └── SEC EDGAR 10-Q
     │
     └── run_investment_committee(ticker, data, rounds=2)
@@ -190,7 +226,7 @@ research_node
 │   ├── llm/
 │   │   └── qwen_integration.py       # Qwen client, structured output, persona calls
 │   ├── tools/
-│   │   ├── external_tools.py         # Alpha Vantage GLOBAL_QUOTE + OVERVIEW
+	│   │   ├─ external_tools.py         # Yahoo Finance + SEC EDGAR tools
 │   │   └── sec_tools.py              # SEC EDGAR 10-Q via edgartools (XBRL)
 │   ├── trading/
 │   │   ├── broker_interface.py       # Abstract BaseBroker contract
@@ -273,7 +309,7 @@ GET /api/portfolio
 | Criterion | Implementation | Status |
 |---|---|---|
 | Ambiguous input handling | 4-path Qwen triage with confidence score | ✅ |
-| External tool invocation | Alpha Vantage + SEC EDGAR (real APIs) | ✅ |
+| External tool invocation | SEC EDGAR 10-Q + Yahoo Finance (real APIs) | ✅ |
 | Human-in-loop gates | Approval checkpoint + broker execution | ✅ |
 | Multi-agent orchestration | Tri-Agent adversarial committee | ✅ |
 | Robinhood MCP integration | `RobinhoodMCPClient` + `MockSimulationEngine` | ✅ |
@@ -287,7 +323,7 @@ GET /api/portfolio
 
 ### Reusable AI Agent Skills
 
-The system implements **modular, reusable skills** that encapsulate domain-specific workflows. Skills are loaded dynamically via YAML manifests, enabling progressive disclosure of capabilities.
+The system implements **modular, reusable skills** that encapsulate domain-specific workflows. Skills are registered in a Python-based registry and invoked on-demand, enabling progressive disclosure of capabilities.
 
 #### Implemented Skills
 
@@ -323,7 +359,7 @@ triggers = invoke_skill("stop_loss_take_profit", portfolio=portfolio_data)
 # Results passed to IC debate as contextual constraints
 ```
 
-**Why This Matters for Judges**:
+**Why This Matters**:
 - ✅ Sophisticated MCP orchestration pattern (progressive skill loading)
 - ✅ Novel algorithmic contributions (HHI, multi-factor risk, correlation clustering)
 - ✅ Production-ready patterns (graceful degradation, error handling)
@@ -366,22 +402,47 @@ triggers = invoke_skill("stop_loss_take_profit", portfolio=portfolio_data)
 
 ---
 
-### Deployment Checklist
+### Cloud Deployment Checklist
 
-**Pre-Production:**
-- [ ] All API keys in `.env` (never in code)
-- [ ] DEBUG=False, LOG_LEVEL=INFO in production
-- [ ] Database transactions tested for trade atomicity
-- [ ] Rate limiting configured (30 req/min per IP)
-- [ ] Health check endpoints verified
+**Alibaba Cloud Function Compute:**
+- [ ] Bootstrap script configured with Python 3.12 path exports
+- [ ] Custom runtime (`custom.debian11`) with bash bootstrap
+- [ ] HTTP trigger enabled (anonymous access or with API keys)
+- [ ] Environment variables set in FC console (DASHSCOPE_API_KEY, etc.)
+- [ ] Dependencies layer created and bound (or inline via requirements)
+- [ ] Memory: 1024 MB, Timeout: 300s, Concurrency: 10
+
+**Streamlit Community Cloud:**
+- [ ] Repository pushed to GitHub (public or private)
+- [ ] Streamlit Cloud connected to GitHub repo
+- [ ] `BACKEND_API_URL` set in Streamlit Secrets (pointing to Alibaba FC endpoint)
+- [ ] App auto-redeploys on git push
+
+**Production:**
+- [ ] All sensitive keys in cloud console or Streamlit Secrets (never committed)
+- [ ] CORS enabled on Alibaba FC for Streamlit domain
+- [ ] Health check endpoints verified (`GET /health`, `POST /invoke`)
+- [ ] Cold start latency acceptable (~8-12s first invocation)
+- [ ] Error recovery tested (simulated API timeouts, network failures)
+
+---
+
+### Local Deployment Checklist
+
+**Development Setup:**
+- [ ] Python 3.12 installed and verified
+- [ ] All dependencies in requirements.txt installed
+- [ ] `.env` file created with DASHSCOPE_API_KEY
+- [ ] Backend starts on port 9000: `uvicorn backend:app --reload --port 9000`
+- [ ] Frontend starts on port 8501: `streamlit run frontend.py`
+- [ ] Both services connect (no "Offline" status in sidebar)
+- [ ] Test a full workflow: Query → Committee → Approval → Execution
+
+**Testing:**
 - [ ] Error recovery tested (simulate API failures)
-
-**Production Launch:**
-- [ ] CI/CD pipeline configured
-- [ ] Monitoring/alerting set up (error rates, latency SLA)
-- [ ] Backup/disaster recovery documented
-- [ ] On-call runbook for common failures
-- [ ] API versioning strategy (v1 prefix)
+- [ ] Health check endpoints verified (`GET /health`, `POST /invoke`)
+- [ ] NDJSON streaming verified (logs display in real-time)
+- [ ] Human-in-loop approval gate works (can approve/reject trades)
 
 ---
 
@@ -396,13 +457,32 @@ triggers = invoke_skill("stop_loss_take_profit", portfolio=portfolio_data)
 
 ## 🤝 Troubleshooting
 
+### Local Development
+
 **`DASHSCOPE_API_KEY not set`** → Add your key to `.env`
 
-**`Alpha Vantage rate limit`** → Free tier is 25 req/day. The system falls back gracefully to mock data.
+**`SEC EDGAR connection timeout`** → edgartools may take 5-10s on first call. Timeouts are normal and cached afterwards.
 
 **`edgartools EDGAR identity`** → Set `EDGAR_IDENTITY` in `.env` or it uses the default demo identity.
 
-**`Port 8002 in use`** → Set `BACKEND_PORT=8003` in `.env`
+**`Port 9000 already in use`** → Change to `BACKEND_PORT=9001` in `.env` or kill the process using port 9000
+
+### Cloud Deployment (Streamlit + Alibaba)
+
+**Frontend shows "Offline"** → Streamlit can't reach Alibaba backend
+- Check `BACKEND_API_URL` in Streamlit Cloud Secrets (should be your Alibaba FC HTTP trigger URL)
+- Verify Alibaba FC HTTP trigger is enabled and accessible
+- Check browser console (F12) for network errors
+- Cold start takes 8-12 seconds; increase frontend timeout if needed
+
+**Alibaba FC function times out** → Qwen query taking too long
+- Increase timeout: FC console → Configurations → Timeout (default 300s)
+- Check Qwen token quota (DashScope console)
+- Optimize query complexity or reduce debate rounds
+
+**Streamlit app keeps showing old code** → Manual reboot needed
+- Go to Streamlit Cloud → App menu (⋮) → Reboot app
+- Or push a new commit to GitHub (auto-deploys)
 
 ---
 
