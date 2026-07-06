@@ -311,16 +311,23 @@ POLL_INTERVAL = 5  # seconds (poll every 5 seconds for new logs)
 def check_api_health() -> bool:
     """
     Check if the FastAPI backend is running and healthy.
+    Uses POST /invoke (verified working endpoint on Alibaba Cloud).
     
     Returns:
         bool: True if API is available, False otherwise
     """
     try:
-        response = requests.get(API_HEALTH_ENDPOINT, timeout=5)
-        return response.status_code == 200
+        # Use POST to /invoke - the verified working endpoint on Alibaba Cloud
+        # GET requests to root may trigger file download restrictions on some cloud providers
+        response = requests.post(f"{API_BASE_URL}/invoke", timeout=5)
+        
+        # Check for successful response with expected status
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("status") == "success"
     except Exception as e:
-        st.session_state.api_available = False
         return False
+    return False
 
 
 _LOG_SEPARATORS = frozenset({"=", "-", " ", "\n"})
