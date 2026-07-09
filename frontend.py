@@ -1324,9 +1324,9 @@ with st.sidebar:
     
     st.markdown("### 🎯 AI Agent Skills")
     st.markdown("""
-    1.  **Portfolio Analyzer:** Evaluates asset allocation, diversification, and optimization. *(Try: "Analyze my positions")*
-    2.  **Risk Manager:** Assesses volatility (beta), correlation, and liquidity risk scores (0-100). *(Try: "What's my portfolio risk?")*
-    3.  **Smart Triggers:** Tracks stop-loss (-10%), take-profit (+30%), and allocation alerts (50%). *(Try: "Monitor my triggers")*
+    - **Portfolio Analyzer**: Evaluates asset allocation, diversification, and optimization. *(Try: "Analyze my positions")*
+    - **Risk Manager**: Assesses volatility, correlation, and liquidity risk scores (0-100). *(Try: "What's my portfolio risk?")*
+    - **Smart Triggers**: Intercepts trades breaching stop-loss (-20%), take-profit (+50%), or allocation limits (50%). *(Try: "Should I buy more TSLA?")*
     """)
     
     st.divider()
@@ -1336,21 +1336,9 @@ with st.sidebar:
     The engine retains conversational context, resolving ambiguous follow-ups automatically:
     
     *   **Flow 1:** `"Analyze TSLA"` ➔ `"How does profitability compare to competitors?"`
-    *   **Flow 2:** `"Show me my portfolio"` ➔ `"What's my largest risk factor?"`
-    *   **Flow 3:** `"Analyze AAPL"` ➔ `"Should I add to this position?"`
+    *   **Flow 2:** `"Analyze AAPL"` ➔ `"Buy $1000 of the above stock"`
     """)
     
-    st.divider()
-    
-    st.markdown("### 🔗 Links")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("[📚 Docs](http://localhost:8002/docs)")
-    with col2:
-        st.markdown("[🔄 Reload](javascript:location.reload())")
-    with col3:
-        st.markdown("[ℹ️ About](#)")
-
     st.divider()
 
     st.markdown("### ⚠️ Disclaimer")
@@ -1812,7 +1800,7 @@ st.divider()
 
 # About / Technical Stack (Collapsible)
 with st.expander("ℹ️ About This Platform"):
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.info("💻 **Frontend**: Streamlit")
@@ -1822,6 +1810,9 @@ with st.expander("ℹ️ About This Platform"):
     
     with col3:
         st.info("🧠 **Orchestration**: LangGraph State Machine")
+    
+    with col4:
+        st.info("🤖 **LLM**: Qwen (Alibaba)")
 
 st.markdown("""
 ---

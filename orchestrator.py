@@ -644,7 +644,6 @@ def general_q_node(state: GraphState) -> GraphState:
             # ────────────────────────────────────────────────────────────────────
             
             from app.tools.yahoo_finance_mcp_client import YahooFinanceMCPClient
-            from app.llm import call_qwen_for_general_qa
             
             yf_client = YahooFinanceMCPClient()
             target_info = yf_client.get_stock_info(ticker)
